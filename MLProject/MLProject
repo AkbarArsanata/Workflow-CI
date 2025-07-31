@@ -1,7 +1,10 @@
-# MLProject (file tanpa ekstensi)
+name: churn_model
 
-name: ChurnPredictionProject
 conda_env: conda.yaml
+
 entry_points:
-  train_model:
-    command: "python modelling.py"
+  main:
+    parameters:
+      data_path: {type: str, default: churn_train_preprocessed.csv}
+    command: >
+      python modelling.py --data_path {data_path}
