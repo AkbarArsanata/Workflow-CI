@@ -8,9 +8,8 @@ on:
 jobs:
   train_model:
     runs-on: ubuntu-latest
-    # Output dari job ini akan digunakan oleh job berikutnya
     outputs:
-      run_id: ${{ steps.run_mlflow_project.outputs.run_id }} # Mengambil output langsung dari step run_mlflow_project
+      run_id: ${{ steps.run_mlflow_project.outputs.run_id }}
 
     steps:
       - name: Checkout Repository
@@ -26,33 +25,24 @@ jobs:
 
       - name: Configure MLflow Tracking (Optional)
         run: |
-          # If you use an external MLflow Tracking Server, configure it here.
-          # Example: export MLFLOW_TRACKING_URI=http://your-mlflow-tracking-server:5000
-          # If you do not set MLFLOW_TRACKING_URI, MLflow will use the local mlruns directory by default.
           echo "MLflow tracking configuration complete (if any)."
 
       - name: Run MLflow Project and Capture Run ID
-        id: run_mlflow_project # ID untuk langkah ini
+        id: run_mlflow_project
         run: |
           # Remove old mlruns directory to avoid confusion with new run IDs
           rm -rf mlruns
           
-          # Run the MLflow project and capture its output
-          # We're looking for the line that says "MLflow Run ID: <ID>" from your Python script,
-          # or "Run ID: <ID>" which mlflow run itself usually prints.
           MLFLOW_OUTPUT=$(conda run -n mlflow_churn_env mlflow run MLProject/ -e train_model 2>&1)
           
           echo "Full MLflow run output:"
           echo "$MLFLOW_OUTPUT"
           
-          # Try to extract Run ID from the output of the mlflow run command itself
-          # This is the most reliable way as mlflow cli prints it explicitly
           RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep -E "Run ID|MLflow Run ID" | awk '{print $NF}' | tail -n 1)
           
           if [ -z "$RUN_ID" ]; then
               echo "Error: Could not extract MLflow Run ID from the mlflow run output."
               echo "Attempting to find it from the filesystem as a fallback..."
-              # Fallback: Try to find the latest run directory if direct parsing fails
               RUN_DIR=$(ls -td mlruns/0/*/ | head -1)
               if [ -z "$RUN_DIR" ]; then
                   echo "Error: Fallback also failed. Cannot extract Run ID."
@@ -62,12 +52,22 @@ jobs:
           fi
           
           echo "Detected MLflow Run ID: $RUN_ID"
-          # Set output run_id for job so it can be accessed by other jobs
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+
+      - name: Upload MLflow Tracking Data (mlruns)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-tracking-data
+          path: mlruns/
+          # Retention period 1 day (optional, default is 90 days)
+          retention-days: 1
+        # Use 'always()' to ensure this step runs even if previous steps fail,
+        # which can be useful for debugging
+        if: always()
+
 
   build_and_push_docker:
     runs-on: ubuntu-latest
-    # Job ini bergantung pada job train_model dan akan mengambil outputnya
     needs: train_model
     steps:
       - name: Checkout Repository
@@ -81,6 +81,23 @@ jobs:
           auto-activate-base: false
           activate-environment: mlflow_churn_env
 
+      - name: Download MLflow Tracking Data (mlruns)
+        uses: actions/download-artifact@v4
+        with:
+          name: mlflow-tracking-data
+          path: . # Download to current working directory, which should recreate mlruns/
+
+      - name: Verify mlruns directory after download
+        run: |
+          echo "Contents of current directory after download:"
+          ls -la
+          echo "Contents of mlruns directory:"
+          ls -la mlruns/
+          if [ ! -d "mlruns" ]; then
+            echo "Error: mlruns directory was not downloaded or is missing!"
+            exit 1
+          fi
+
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
@@ -89,7 +106,6 @@ jobs:
 
       - name: Build and Push MLflow Model Docker Image
         run: |
-          # Mengambil Run ID dari output job train_model
           MLFLOW_RUN_ID="${{ needs.train_model.outputs.run_id }}"
           
           echo "Debugging: Value of MLFLOW_RUN_ID: $MLFLOW_RUN_ID"
