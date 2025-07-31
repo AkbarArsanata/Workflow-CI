@@ -47,7 +47,8 @@ jobs:
         run: |
           # Mencari direktori run terbaru di mlruns/0/
           # Ini adalah cara paling robust untuk mendapatkan run ID yang baru dibuat
-          RUN_DIR=$(find mlruns/0 -maxdepth 1 -mindepth 1 -type d -printf '%T@ %p\n' | sort -n | tail -n 1 | awk '{print $2}')
+          # Menggunakan ls -td * untuk memastikan direktori terbaru ditemukan
+          RUN_DIR=$(ls -td mlruns/0/*/ | head -1)
           
           if [ -z "$RUN_DIR" ]; then
               echo "Error: Could not find MLflow run directory. Cannot extract Run ID."
@@ -87,6 +88,8 @@ jobs:
         run: |
           # Mengambil Run ID dari output job train_model
           MLFLOW_RUN_ID="${{ needs.train_model.outputs.run_id }}"
+          
+          echo "Debugging: Value of MLFLOW_RUN_ID: $MLFLOW_RUN_ID"
           
           if [ -z "$MLFLOW_RUN_ID" ]; then
             echo "Error: MLflow Run ID not found from previous job. Cannot build Docker image."
