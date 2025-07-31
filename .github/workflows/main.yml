@@ -57,12 +57,9 @@ jobs:
       - name: Upload MLflow Tracking Data (mlruns)
         uses: actions/upload-artifact@v4
         with:
-          name: mlflow-tracking-data
-          path: mlruns/
-          # Retention period 1 day (optional, default is 90 days)
+          name: mlflow-tracking-data # Nama artefak
+          path: mlruns/ # Direktori yang akan diunggah
           retention-days: 1
-        # Use 'always()' to ensure this step runs even if previous steps fail,
-        # which can be useful for debugging
         if: always()
 
 
@@ -81,18 +78,19 @@ jobs:
           auto-activate-base: false
           activate-environment: mlflow_churn_env
 
+      # PERUBAHAN KRITIS DI SINI
       - name: Download MLflow Tracking Data (mlruns)
         uses: actions/download-artifact@v4
         with:
           name: mlflow-tracking-data
-          path: . # Download to current working directory, which should recreate mlruns/
+          path: mlruns/ # Ubah path download ke mlruns/ agar folder mlruns/ terbentuk kembali
 
       - name: Verify mlruns directory after download
         run: |
           echo "Contents of current directory after download:"
           ls -la
           echo "Contents of mlruns directory:"
-          ls -la mlruns/
+          ls -la mlruns/ # Ini sekarang seharusnya berfungsi
           if [ ! -d "mlruns" ]; then
             echo "Error: mlruns directory was not downloaded or is missing!"
             exit 1
@@ -117,7 +115,6 @@ jobs:
 
           echo "Building Docker image for MLflow Run ID: $MLFLOW_RUN_ID"
           
-          # Perintah build-docker yang sudah diperbaiki
           conda run -n mlflow_churn_env mlflow models build-docker \
             --model-uri "runs:/$MLFLOW_RUN_ID/model" \
             --name ibrahimakbararsanata/churn-prediction-model:latest
