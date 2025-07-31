@@ -37,6 +37,8 @@ COPY MLProject/churn_test_preprocessed.csv .
 
 # Deklarasikan build argument untuk MLflow Run ID.
 ARG MLFLOW_RUN_ID
+ENV MLFLOW_RUN_ID=${MLFLOW_RUN_ID}
 
-# Perintah default untuk menjalankan MLflow scoring server.
-CMD ["micromamba", "run", "-n", "mlflow_churn_env", "mlflow", "models", "serve", "-m", "runs:/${MLFLOW_RUN_ID}/model", "--host", "0.0.0.0", "--port", "8080"]
+ENTRYPOINT ["micromamba", "run", "-n", "mlflow_churn_env", "mlflow", "models", "serve"]
+CMD ["-m", "runs:/${MLFLOW_RUN_ID}/model", "--host", "0.0.0.0", "--port", "8080"]
+
